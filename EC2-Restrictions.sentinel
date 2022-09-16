@@ -1,23 +1,27 @@
-# This policy uses the Sentinel tfstate/v2 import to require that
-# all existing EC2 instances have instance types from an allowed list
+# Imports mock data
+import "tfplan/v2" as tfplan
 
-# Import common-functions/tfstate-functions/tfstate-functions.sentinel
-# with alias "state"
-import "tfstate-functions" as state
+# Get all AWS instances from all modules
+ec2_instances = filter tfplan.resource_changes as _, rc {
+    rc.type is "aws_instance" and
+        (rc.change.actions contains "create" or rc.change.actions is ["update"])
+}
 
-# Allowed EC2 Instance Types
-# Include "null" to allow missing or computed values
-allowed_types = ["t2.small", "t2.medium"]
+# Allowed Types
+allowed_types = [
+    "t2.micro",
+    "t2.small",
+    "t2.medium",
+]
 
-# Get all EC2 instances
-allEC2Instances = state.find_resources("aws_instance")
+# Rule to restrict instance types
+instance_type_allowed = rule {
+    all ec2_instances as _, instance {
+        instance.change.after.instance_type in allowed_types
+    }
+}
 
-# Filter to EC2 instances with violations
-# Warnings will be printed for all violations since the last parameter is true
-violatingEC2Instances = state.filter_attribute_not_in_list(allEC2Instances,
-                        "instance_type", allowed_types, true)
-
-# Main rule
+# Main rule that requires other rules to be true
 main = rule {
-  length(violatingEC2Instances["messages"]) is 0
+    (instance_type_allowed and mandatory_instance_tags) else true
 }
