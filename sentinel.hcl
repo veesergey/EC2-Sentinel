@@ -3,5 +3,5 @@ policy "EC2-Restrictions" {
 }
 
 policy "tag_enforcement" {
-  enforcement_level = "advisory"
+  enforcement_level = "soft-mandatory"
 }
